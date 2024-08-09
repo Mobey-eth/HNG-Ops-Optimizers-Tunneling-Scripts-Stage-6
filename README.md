@@ -14,7 +14,7 @@ Create a streamlined tunneling service as an alternative to `ngrok` and `serveo.
 - **Automatic Port Management:** Dynamically allocate and manage ports for reverse forwarding.
 
 ---
-## Installation and Setup
+## Installation and Setup For TUNNEL SERVICE 1
 
 ### Prerequisites
 - Ubuntu 20.04 or later
@@ -93,7 +93,7 @@ Add or modify the following lines:
 
 ```
 Match User tunnel
-    ForceCommand /usr/local/bin/tunnel_service.sh
+    ForceCommand /usr/local/bin/tunnel_service_1.sh
     PermitTunnel yes
     GatewayPorts yes
     AllowTcpForwarding remote
@@ -114,7 +114,7 @@ sudo adduser --disabled-password --gecos "" tunnel
 Create and edit the tunnel service script:
 
 ```bash
-sudo nano /usr/local/bin/tunnel_service.sh
+sudo nano /usr/local/bin/tunnel_service_1.sh
 ```
 
 Add the content of the tunnel service script (as provided in the "How the Tunnel Service Works" section).
@@ -122,9 +122,70 @@ Add the content of the tunnel service script (as provided in the "How the Tunnel
 Make the script executable:
 
 ```bash
-sudo chmod +x /usr/local/bin/tunnel_service.sh
+sudo chmod +x /usr/local/bin/tunnel_service_1.sh
 ```
 
+---
+## Installation and Setup For TUNNEL SERVICE 2
+
+### Prerequisites
+- Ubuntu 20.04 or later
+- A domain name (e.g., devobs.me)
+
+### Step 1: Update and Install Dependencies
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y openssh-server
+```
+
+### Step 2: SSH Configuration
+
+```bash
+sudo nano /etc/ssh/sshd_config
+```
+
+Add or modify the following lines:
+
+```
+PasswordAuthentication yes
+PermitEmptyPasswords yes
+ChallengeResponseAuthentication no
+PrintMod no
+PrintLastLog no
+Match User no-auth-user
+    ForceCommand /usr/local/bin/tunnel_service_2.sh
+    PermitTunnel yes
+    GatewayPorts yes
+    AllowTcpForwarding yes
+```
+
+Restart the SSH service:
+
+```bash
+sudo systemctl restart ssh
+```
+
+### Step 3: Create no-auth-user User
+```bash
+sudo adduser --disabled-password --gecos "" no-auth-user
+```
+
+### Step 4: Set Up Tunnel Service Script
+Create and edit the tunnel service script:
+
+```bash
+sudo nano /usr/local/bin/tunnel_service_2.sh
+```
+
+Add the content of the tunnel service 2 script in the repository.
+
+Make the script executable:
+
+```bash
+sudo chmod +x /usr/local/bin/tunnel_service_2.sh
+```
+
+---
 ## How the Tunnel Service Works
 
 ### 1. Initialization and Setup
