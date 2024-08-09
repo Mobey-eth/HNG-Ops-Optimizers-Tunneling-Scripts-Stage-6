@@ -14,6 +14,116 @@ Create a streamlined tunneling service as an alternative to `ngrok` and `serveo.
 - **Automatic Port Management:** Dynamically allocate and manage ports for reverse forwarding.
 
 ---
+## Installation and Setup
+
+### Prerequisites
+- Ubuntu 20.04 or later
+- Root access to the server
+- A domain name (e.g., mobyme.site)
+
+### Step 1: Update and Install Dependencies
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y nginx certbot python3-certbot-nginx
+```
+
+### Step 2: DNS Configuration
+1. Log in to your domain registrar's DNS management page.
+2. Add an A record pointing your domain (e.g., mobyme.site) to your server's IP address.
+3. Add a wildcard CNAME record:
+   - Host: *
+   - Points to: @ (or your domain name)
+
+### Step 3: SSL Certificate Setup
+We'll use the manual DNS challenge method for obtaining a wildcard certificate:
+
+```bash
+sudo certbot certonly --manual --preferred-challenges=dns -d mobyme.site -d *.mobyme.site
+```
+
+Follow the prompts and add the TXT record to your DNS configuration when asked. Wait for DNS propagation before continuing.
+
+### Step 4: Nginx Configuration
+Create and edit the Nginx configuration file:
+
+```bash
+sudo nano /etc/nginx/sites-available/tunnel
+```
+
+Add the following content:
+
+```nginx
+server {
+    listen 80;
+    server_name *.mobyme.site;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl default_server;
+    server_name *.mobyme.site;
+
+    ssl_certificate /etc/letsencrypt/live/mobyme.site/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mobyme.site/privkey.pem;
+
+    location / {
+        return 404;
+    }
+}
+
+include /etc/nginx/sites-enabled/*.conf;
+```
+
+Enable the configuration:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/tunnel /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### Step 5: SSH Configuration
+Edit the SSH configuration file:
+
+```bash
+sudo nano /etc/ssh/sshd_config
+```
+
+Add or modify the following lines:
+
+```
+Match User tunnel
+    ForceCommand /usr/local/bin/tunnel_service.sh
+    PermitTunnel yes
+    GatewayPorts yes
+    AllowTcpForwarding remote
+```
+
+Restart the SSH service:
+
+```bash
+sudo systemctl restart sshd
+```
+
+### Step 6: Create Tunnel User
+```bash
+sudo adduser --disabled-password --gecos "" tunnel
+```
+
+### Step 7: Set Up Tunnel Service Script
+Create and edit the tunnel service script:
+
+```bash
+sudo nano /usr/local/bin/tunnel_service.sh
+```
+
+Add the content of the tunnel service script (as provided in the "How the Tunnel Service Works" section).
+
+Make the script executable:
+
+```bash
+sudo chmod +x /usr/local/bin/tunnel_service.sh
+```
 
 ## How the Tunnel Service Works
 
@@ -141,37 +251,26 @@ log "Script running. Waiting for connection."
 handle_connection 3000
 log "Script ended"
 ```
-
 ---
 
-## Nginx Configuration
+### Step 8: Configure Sudo Permissions
+Edit the sudoers file for the tunnel user:
 
-Nginx is configured to handle HTTP requests and redirect them to HTTPS:
-
-```conf
-server {
-    listen 80;
-    server_name *.mobyme.site;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl default_server;
-    server_name *.mobyme.site;
-
-    ssl_certificate /etc/letsencrypt/live/mobyme.site/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/mobyme.site/privkey.pem;
-
-    location / {
-        return 404;
-    }
-}
-
-# Individual subdomain configurations will be included here
-include /etc/nginx/sites-enabled/*.conf;
+```bash
+sudo visudo -f /etc/sudoers.d/tunnel
 ```
 
----
+Add the following lines:
+
+```
+tunnel ALL=(ALL) NOPASSWD: /usr/bin/tee /etc/nginx/sites-available/*.conf
+tunnel ALL=(ALL) NOPASSWD: /usr/bin/ln -s /etc/nginx/sites-available/*.conf /etc/nginx/sites-enabled/
+tunnel ALL=(ALL) NOPASSWD: /usr/sbin/nginx -s reload
+tunnel ALL=(ALL) NOPASSWD: /sbin/iptables -t nat -A PREROUTING -p tcp -d *.mobyme.site --dport 80 -j REDIRECT --to-port *
+tunnel ALL=(ALL) NOPASSWD: /sbin/iptables -t nat -A PREROUTING -p tcp -d *.mobyme.site --dport 443 -j REDIRECT --to-port *
+tunnel ALL=(ALL) NOPASSWD: /sbin/iptables -t nat -D PREROUTING -p tcp -d *.mobyme.site --dport 80 -j REDIRECT --to-port *
+tunnel ALL=(ALL) NOPASSWD: /sbin/iptables -t nat -D PREROUTING -p tcp -d *.mobyme.site --dport 443 -j REDIRECT --to-port *
+```
 
 ## Usage
 
@@ -184,6 +283,13 @@ ssh -R 8080:localhost:3000 tunnel@mobyme.site
 This will reverse forward your local application on port 3000 to a dynamically generated subdomain on `mobyme.site`, making it publicly accessible.
 
 ---
+
+## Troubleshooting
+
+1. If you encounter permission issues, ensure the tunnel user has the correct sudo permissions.
+2. Check Nginx error logs: `sudo tail -f /var/log/nginx/error.log`
+3. Verify iptables rules: `sudo iptables -t nat -L PREROUTING`
+4. Ensure the SSL certificate is valid and properly configured.
 
 ## Conclusion
 
