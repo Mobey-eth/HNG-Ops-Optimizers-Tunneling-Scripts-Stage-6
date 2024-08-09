@@ -334,8 +334,7 @@ tunnel ALL=(ALL) NOPASSWD: /sbin/iptables -t nat -D PREROUTING -p tcp -d *.mobym
 ```
 ---
 ## How the Tunnel Service Works (FOR TUNNEL SERVICE 2)
-
-The `handle_forwarding.sh` script is designed to facilitate SSH port forwarding by:
+The `tunnel_service_2.sh` script is designed to facilitate SSH port forwarding by:
 
 - Determining the port on which the SSH server is listening for incoming connections.
 - Outputting a message indicating the port and IP address where the forwarded connections are being directed.
@@ -357,17 +356,30 @@ PARENT_PID=$(ps -o ppid= -p $$ | tr -d ' ')
 ```
 PORT=$(sudo /usr/bin/ss -tulnp | grep "pid=$PARENT_PID" | awk '{print $5}' | awk -F: '{print $2}' | sort -n | uniq | tr '\n' ' ' | xargs)
 ```
+- sudo /usr/bin/ss -tulnp lists all the TCP ports currently in use along with their associated processes.
+- grep "pid=$PARENT_PID" filters the list to include only lines associated with the sshd process.
+- awk '{print $5}' extracts the column that contains the local addresses and ports.
+- awk -F: '{print $2}' isolates the port numbers from the addresses.
+- sort -n | uniq sorts the ports numerically and removes duplicates to get a unique list of ports.
+- tr '\n' ' ' converts the newline-separated port list into a space-separated string.
+- xargs ensures that the final output is correctly formatted and assigned to the PORT variable.
 
 ### Output the Forwarding Information
 
 ```
 echo "Forwarding TCP connections from http://devobs.me:${PORT}"
 ```
+This line prints a message to the terminal indicating the domain and port where TCP connections are being forwarded. The domain http://devobs.me is used as a placeholder for the actual domain or IP address.
 
+### Keep the SSH Session Alive
 
+```
+while true; do sleep infinity; done
+```
+This infinite loop ensures that the script keeps running and maintains the SSH tunnel open. The sleep infinity command effectively prevents the script from exiting, keeping the SSH session alive.
 
-
-## Usage
+---
+## Usage (FOR TUNNEL SERVICE 1)
 
 To start the tunneling service, use the following SSH command:
 
@@ -379,13 +391,19 @@ This will reverse forward your local application on port 3000 to a dynamically g
 
 ---
 
-## Troubleshooting
+## Usage (FOR TUNNEL SERVICE 2)
+To start the tunneling service, the SSH command should be in this form: 
 
-1. If you encounter permission issues, ensure the tunnel user has the correct sudo permissions.
-2. Check Nginx error logs: `sudo tail -f /var/log/nginx/error.log`
-3. Verify iptables rules: `sudo iptables -t nat -L PREROUTING`
-4. Ensure the SSL certificate is valid and properly configured.
+```bash
+ssh -R <remote_port>:localhost:3000 no-auth-user@devobs.me
+```
 
+The response would be in the form:
+```
+Forwarding TCP connections from http://devobs.me:<remote_port>
+```
+
+---
 ## Setting Up Automated User Creation with PAM and SSH
 This provides instructions on how to configure PAM (Pluggable Authentication Module) to automatically create a new user when an SSH login attempt is made.
 
