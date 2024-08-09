@@ -117,7 +117,7 @@ Create and edit the tunnel service script:
 sudo nano /usr/local/bin/tunnel_service_1.sh
 ```
 
-Add the content of the tunnel service script (as provided in the "How the Tunnel Service Works" section).
+Add the content of the tunnel service 1 script in the repository.
 
 Make the script executable:
 
@@ -186,7 +186,7 @@ sudo chmod +x /usr/local/bin/tunnel_service_2.sh
 ```
 
 ---
-## How the Tunnel Service Works
+## How the Tunnel Service Works (FOR TUNNEL SERVICE 1)
 
 ### 1. Initialization and Setup
 
@@ -332,6 +332,40 @@ tunnel ALL=(ALL) NOPASSWD: /sbin/iptables -t nat -A PREROUTING -p tcp -d *.mobym
 tunnel ALL=(ALL) NOPASSWD: /sbin/iptables -t nat -D PREROUTING -p tcp -d *.mobyme.site --dport 80 -j REDIRECT --to-port *
 tunnel ALL=(ALL) NOPASSWD: /sbin/iptables -t nat -D PREROUTING -p tcp -d *.mobyme.site --dport 443 -j REDIRECT --to-port *
 ```
+---
+## How the Tunnel Service Works (FOR TUNNEL SERVICE 2)
+
+The `handle_forwarding.sh` script is designed to facilitate SSH port forwarding by:
+
+- Determining the port on which the SSH server is listening for incoming connections.
+- Outputting a message indicating the port and IP address where the forwarded connections are being directed.
+- Keeping the SSH session alive to maintain the tunnel.
+
+### Script Breakdown
+
+### Retrieve Parent Process ID (PID) of SSHD
+
+```bash
+PARENT_PID=$(ps -o ppid= -p $$ | tr -d ' ')
+```
+
+- ps -o ppid= -p $$ retrieves the parent process ID (PID) of the current shell, which should be the sshd process handling the SSH connection.
+- tr -d ' ' removes any whitespace from the PID output to ensure it's clean and correctly formatted.
+
+### Find and Extract the Forwarded Port
+
+```
+PORT=$(sudo /usr/bin/ss -tulnp | grep "pid=$PARENT_PID" | awk '{print $5}' | awk -F: '{print $2}' | sort -n | uniq | tr '\n' ' ' | xargs)
+```
+
+### Output the Forwarding Information
+
+```
+echo "Forwarding TCP connections from http://devobs.me:${PORT}"
+```
+
+
+
 
 ## Usage
 
