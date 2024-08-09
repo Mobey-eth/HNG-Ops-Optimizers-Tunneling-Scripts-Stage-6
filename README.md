@@ -386,6 +386,74 @@ This will reverse forward your local application on port 3000 to a dynamically g
 3. Verify iptables rules: `sudo iptables -t nat -L PREROUTING`
 4. Ensure the SSL certificate is valid and properly configured.
 
+## Setting Up Automated User Creation with PAM and SSH
+This provides instructions on how to configure PAM (Pluggable Authentication Module) to automatically create a new user when an SSH login attempt is made.
+
+## 1. Create the create_user.sh Script
+1. Create the Script File
+
+Create a file named create_user.sh with the following content:
+```bash
+#!/bin/bash
+
+# If a username is provided, don't create a new user
+if [ -n "$PAM_USER" ] && [ "$PAM_USER" != "sshd" ]; then
+    exit 0
+fi
+
+# Generate a random username
+USERNAME=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 8 | head -n 1)
+
+# Check if the user already exists
+if id "$USERNAME" &>/dev/null; then
+    exit 0
+fi
+
+# Create the user with a home directory and set the shell to /bin/bash
+useradd -m -s /bin/bash $USERNAME
+```
+
+2. Move the Script
+
+Move the create_user.sh script to the appropriate directory:
+```bash
+sudo mv create_user.sh /lib/x86_64-linux-gnu/security/pam_create_user.sh
+```
+
+3. Make the Script Executable
+
+Change the permissions of the script to make it executable:
+```bash
+sudo chmod +x /lib/x86_64-linux-gnu/security/pam_create_user.sh
+
+```
+
+## 2. Update PAM Configuration
+1. Edit the PAM Configuration for SSH
+
+Open the /etc/pam.d/sshd file in your preferred text editor. For example:
+```bash
+sudo nano /etc/pam.d/sshd
+```
+
+2. Add the PAM Exec Module
+
+Add the following line to the top of the file:
+```bash
+auth       required     pam_exec.so     /lib/x86_64-linux-gnu/security/pam_create_user.sh
+```
+
+3. Save and Close the File
+
+Save the changes and exit the text editor.
+
+4. Restart the SSH Service
+To apply the changes, restart the SSH service:
+```bash
+sudo systemctl restart ssh.service
+```
+
+
 ## Conclusion
 
 This tunneling service is made to be an alternative to `ngrok` and `serveo.net`, offering secure, dynamic URLs for accessing local applications using SSH reverse forwarding and Nginx proxy management.
